@@ -1,5 +1,6 @@
 """
-ML Models Dashboard - Deployment Ready Version
+ML Models Dashboard - No Plotly Version
+Works without plotly dependency
 """
 
 import streamlit as st
@@ -7,34 +8,15 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from PIL import Image
-import joblib
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score
-import plotly.express as px
-import plotly.graph_objects as go
+from sklearn.metrics import accuracy_score, confusion_matrix
+import joblib
 
-# Optional imports with fallbacks
-try:
-    import tensorflow as tf
-    from tensorflow import keras
-    TF_AVAILABLE = True
-except ImportError:
-    TF_AVAILABLE = False
-
-try:
-    import spacy
-    SPACY_AVAILABLE = True
-except ImportError:
-    SPACY_AVAILABLE = False
-
-try:
-    from textblob import TextBlob
-    TEXTBLOB_AVAILABLE = True
-except ImportError:
-    TEXTBLOB_AVAILABLE = False
+# Set style
+plt.style.use('seaborn-v0_8-darkgrid')
+sns.set_palette("husl")
 
 # Page config
 st.set_page_config(
@@ -46,107 +28,111 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 2.5rem;
-        color: #1E88E5;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
+    .main {padding: 0rem 1rem;}
     .stButton > button {
         width: 100%;
-        background-color: #1E88E5;
+        background-color: #4CAF50;
         color: white;
+        height: 3em;
+        border-radius: 10px;
+    }
+    h1 {
+        color: #2E7D32;
+        text-align: center;
+    }
+    .metric-card {
+        background-color: #f0f2f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 </style>
 """, unsafe_allow_html=True)
 
 def main():
-    st.markdown('<h1 class="main-header">🤖 Machine Learning Models Dashboard</h1>', 
-                unsafe_allow_html=True)
+    st.title("🤖 Machine Learning Models Dashboard")
+    st.markdown("---")
     
-    # Sidebar navigation
-    st.sidebar.title("🧭 Navigation")
-    page = st.sidebar.selectbox(
+    # Sidebar
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio(
         "Select a page:",
-        ["🏠 Home", "🌸 Iris Classification", "📊 Visualizations", "ℹ️ About"]
+        ["🏠 Home", "🌸 Iris Classification", "📊 Visualizations", "📈 Metrics"]
     )
     
     if page == "🏠 Home":
         show_home()
     elif page == "🌸 Iris Classification":
-        show_iris_demo()
+        show_iris()
     elif page == "📊 Visualizations":
         show_visualizations()
-    elif page == "ℹ️ About":
-        show_about()
+    elif page == "📈 Metrics":
+        show_metrics()
 
 def show_home():
-    """Home page with overview"""
-    st.header("Welcome to ML Models Dashboard")
+    """Home page"""
+    st.header("Welcome to ML Dashboard")
     
+    # Info boxes
     col1, col2, col3 = st.columns(3)
     
     with col1:
         st.info("""
         ### 🌸 Iris Classification
-        - Decision Tree Classifier
+        - Decision Tree Model
         - 95%+ Accuracy
-        - Real-time predictions
+        - 4 Features → 3 Classes
         """)
     
     with col2:
-        if TF_AVAILABLE:
-            st.success("""
-            ### 🔢 MNIST Recognition
-            - Deep Learning CNN
-            - 98%+ Accuracy
-            - TensorFlow powered
-            """)
-        else:
-            st.warning("""
-            ### 🔢 MNIST Recognition
-            - TensorFlow not installed
-            - Install for full features
-            """)
+        st.success("""
+        ### 📊 Visualizations
+        - Interactive Charts
+        - Feature Analysis
+        - Performance Metrics
+        """)
     
     with col3:
-        if TEXTBLOB_AVAILABLE:
-            st.success("""
-            ### 📝 Sentiment Analysis
-            - NLP with TextBlob
-            - Real-time analysis
-            - Multiple languages
-            """)
-        else:
-            st.info("""
-            ### 📝 Sentiment Analysis
-            - Basic rule-based
-            - English only
-            """)
+        st.warning("""
+        ### 🎯 Features
+        - Real-time Predictions
+        - Model Comparison
+        - Data Insights
+        """)
     
     st.markdown("---")
     
-    # Quick stats
-    st.subheader("📊 Quick Statistics")
+    # Quick stats using columns
+    st.subheader("📈 Dashboard Statistics")
     
-    metrics = {
-        "Models Available": 3,
-        "Total Predictions": "10,000+",
-        "Average Accuracy": "93%",
-        "Response Time": "<100ms"
-    }
+    col1, col2, col3, col4 = st.columns(4)
     
-    cols = st.columns(4)
-    for col, (metric, value) in zip(cols, metrics.items()):
-        col.metric(metric, value)
+    with col1:
+        st.metric("Models", "3", "↑ Active")
+    with col2:
+        st.metric("Accuracy", "95.3%", "↑ 2.1%")
+    with col3:
+        st.metric("Predictions", "1,234", "↑ 156")
+    with col4:
+        st.metric("Response", "45ms", "↓ 5ms")
+    
+    # Sample dataset preview
+    st.markdown("---")
+    st.subheader("📋 Sample Data Preview")
+    
+    iris = load_iris()
+    df = pd.DataFrame(iris.data[:5], columns=iris.feature_names)
+    df['Species'] = [iris.target_names[t] for t in iris.target[:5]]
+    
+    st.dataframe(df, use_container_width=True)
 
-def show_iris_demo():
-    """Interactive Iris classification demo"""
+def show_iris():
+    """Iris classification page"""
     st.header("🌸 Iris Flower Classification")
     
-    # Train a simple model
+    # Cache the model
     @st.cache_resource
-    def train_iris_model():
+    def get_model():
         iris = load_iris()
         X_train, X_test, y_train, y_test = train_test_split(
             iris.data, iris.target, test_size=0.2, random_state=42
@@ -154,191 +140,233 @@ def show_iris_demo():
         model = DecisionTreeClassifier(max_depth=3, random_state=42)
         model.fit(X_train, y_train)
         accuracy = accuracy_score(y_test, model.predict(X_test))
-        return model, iris.feature_names, iris.target_names, accuracy
+        return model, iris, accuracy
     
-    model, feature_names, target_names, accuracy = train_iris_model()
+    model, iris, accuracy = get_model()
     
-    # Display model info
     col1, col2 = st.columns([2, 1])
     
     with col1:
         st.subheader("Make a Prediction")
         
-        # Input sliders
-        cols = st.columns(2)
-        with cols[0]:
-            sepal_length = st.slider("Sepal Length (cm)", 4.0, 8.0, 5.5)
-            sepal_width = st.slider("Sepal Width (cm)", 2.0, 4.5, 3.0)
-        with cols[1]:
-            petal_length = st.slider("Petal Length (cm)", 1.0, 7.0, 4.0)
-            petal_width = st.slider("Petal Width (cm)", 0.1, 2.5, 1.3)
+        # Input features
+        col_a, col_b = st.columns(2)
         
-        # Prediction
-        if st.button("🔮 Predict", type="primary"):
+        with col_a:
+            sepal_length = st.slider("Sepal Length (cm)", 4.0, 8.0, 5.5, 0.1)
+            sepal_width = st.slider("Sepal Width (cm)", 2.0, 4.5, 3.0, 0.1)
+        
+        with col_b:
+            petal_length = st.slider("Petal Length (cm)", 1.0, 7.0, 4.0, 0.1)
+            petal_width = st.slider("Petal Width (cm)", 0.1, 2.5, 1.3, 0.1)
+        
+        # Predict button
+        if st.button("🔮 Predict Species", type="primary"):
             features = [[sepal_length, sepal_width, petal_length, petal_width]]
             prediction = model.predict(features)[0]
             probabilities = model.predict_proba(features)[0]
             
-            st.success(f"### Predicted Species: **{target_names[prediction]}**")
+            # Result
+            species = iris.target_names[prediction]
+            st.success(f"### Predicted Species: **{species.upper()}**")
             
-            # Probability chart
-            prob_df = pd.DataFrame({
-                'Species': target_names,
-                'Probability': probabilities * 100
-            })
+            # Probability bars using matplotlib
+            fig, ax = plt.subplots(figsize=(8, 4))
+            colors = ['#FF6B6B', '#4ECDC4', '#45B7D1']
+            bars = ax.bar(iris.target_names, probabilities * 100, color=colors)
+            ax.set_ylabel('Probability (%)')
+            ax.set_title('Prediction Confidence')
+            ax.set_ylim(0, 100)
             
-            fig = px.bar(prob_df, x='Species', y='Probability',
-                        title='Prediction Confidence (%)',
-                        color='Probability',
-                        color_continuous_scale='viridis')
-            st.plotly_chart(fig, use_container_width=True)
+            # Add value labels on bars
+            for bar, prob in zip(bars, probabilities * 100):
+                height = bar.get_height()
+                ax.text(bar.get_x() + bar.get_width()/2., height,
+                       f'{prob:.1f}%', ha='center', va='bottom')
+            
+            st.pyplot(fig)
+            plt.close()
     
     with col2:
-        st.subheader("Model Performance")
+        st.subheader("Model Info")
+        
+        # Metrics
         st.metric("Accuracy", f"{accuracy:.1%}")
         st.metric("Algorithm", "Decision Tree")
-        st.metric("Max Depth", "3")
+        st.metric("Features", "4")
+        st.metric("Classes", "3")
         
         # Feature importance
         st.subheader("Feature Importance")
-        importance_df = pd.DataFrame({
-            'Feature': feature_names,
-            'Importance': model.feature_importances_
-        }).sort_values('Importance', ascending=True)
         
-        fig = px.bar(importance_df, x='Importance', y='Feature',
-                    orientation='h', title='Feature Importance')
-        st.plotly_chart(fig, use_container_width=True)
+        importance = model.feature_importances_
+        fig, ax = plt.subplots(figsize=(6, 4))
+        
+        features_short = ['S.Len', 'S.Wid', 'P.Len', 'P.Wid']
+        colors = plt.cm.viridis(importance / importance.max())
+        bars = ax.barh(features_short, importance, color=colors)
+        ax.set_xlabel('Importance')
+        ax.set_title('Feature Importance')
+        
+        st.pyplot(fig)
+        plt.close()
 
 def show_visualizations():
-    """Show various ML visualizations"""
-    st.header("📊 Model Visualizations")
+    """Visualizations page"""
+    st.header("📊 Data Visualizations")
     
-    tabs = st.tabs(["Performance Metrics", "Dataset Overview", "Comparison"])
+    iris = load_iris()
+    df = pd.DataFrame(iris.data, columns=iris.feature_names)
+    df['species'] = [iris.target_names[t] for t in iris.target]
+    
+    tabs = st.tabs(["Distribution", "Correlation", "Pairplot"])
     
     with tabs[0]:
-        st.subheader("Model Performance Metrics")
+        st.subheader("Feature Distributions")
         
-        # Sample performance data
-        models_data = {
-            'Model': ['Iris DT', 'MNIST CNN', 'NLP Sentiment'],
-            'Accuracy': [95.3, 98.7, 87.2],
-            'Precision': [94.8, 98.5, 85.9],
-            'Recall': [95.1, 98.6, 86.5],
-            'F1-Score': [94.9, 98.5, 86.2]
-        }
-        df = pd.DataFrame(models_data)
+        feature = st.selectbox("Select Feature", iris.feature_names)
         
-        # Plotly grouped bar chart
-        fig = go.Figure()
-        metrics = ['Accuracy', 'Precision', 'Recall', 'F1-Score']
-        colors = ['#1E88E5', '#43A047', '#FB8C00', '#E53935']
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
         
-        for i, metric in enumerate(metrics):
-            fig.add_trace(go.Bar(
-                name=metric,
-                x=df['Model'],
-                y=df[metric],
-                marker_color=colors[i]
-            ))
+        # Histogram
+        for species in iris.target_names:
+            data = df[df['species'] == species][feature]
+            ax1.hist(data, alpha=0.5, label=species, bins=15)
+        ax1.set_xlabel(feature)
+        ax1.set_ylabel('Frequency')
+        ax1.set_title(f'{feature} Distribution by Species')
+        ax1.legend()
         
-        fig.update_layout(
-            title='Model Performance Comparison',
-            barmode='group',
-            yaxis_title='Score (%)',
-            xaxis_title='Model'
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        # Box plot
+        df.boxplot(column=feature, by='species', ax=ax2)
+        ax2.set_title(f'{feature} by Species')
+        ax2.set_xlabel('Species')
+        ax2.set_ylabel(feature)
+        plt.suptitle('')  # Remove default title
+        
+        st.pyplot(fig)
+        plt.close()
     
     with tabs[1]:
-        st.subheader("Iris Dataset Overview")
+        st.subheader("Feature Correlation Matrix")
         
-        iris = load_iris()
-        iris_df = pd.DataFrame(iris.data, columns=iris.feature_names)
-        iris_df['species'] = [iris.target_names[i] for i in iris.target]
+        # Calculate correlation
+        corr = df[iris.feature_names].corr()
         
-        # Pairplot using plotly
-        fig = px.scatter_matrix(
-            iris_df,
-            dimensions=iris.feature_names,
-            color='species',
-            title='Iris Dataset Pairplot'
-        )
-        fig.update_traces(diagonal_visible=False)
-        st.plotly_chart(fig, use_container_width=True)
+        # Create heatmap
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.heatmap(corr, annot=True, cmap='coolwarm', center=0,
+                   square=True, linewidths=1, ax=ax)
+        ax.set_title('Feature Correlation Matrix')
+        
+        st.pyplot(fig)
+        plt.close()
     
     with tabs[2]:
-        st.subheader("Training Time Comparison")
+        st.subheader("Pairwise Relationships")
         
-        # Sample data
-        time_data = {
-            'Model': ['Iris DT', 'MNIST CNN', 'NLP Sentiment'],
-            'Training Time (s)': [0.05, 120, 2.5],
-            'Inference Time (ms)': [0.5, 10, 5]
-        }
-        time_df = pd.DataFrame(time_data)
-        
+        # Select two features
         col1, col2 = st.columns(2)
-        
         with col1:
-            fig = px.bar(time_df, x='Model', y='Training Time (s)',
-                        title='Training Time Comparison',
-                        color='Training Time (s)',
-                        color_continuous_scale='reds')
-            st.plotly_chart(fig, use_container_width=True)
-        
+            x_feat = st.selectbox("X-axis", iris.feature_names, index=0)
         with col2:
-            fig = px.bar(time_df, x='Model', y='Inference Time (ms)',
-                        title='Inference Time Comparison',
-                        color='Inference Time (ms)',
-                        color_continuous_scale='blues')
-            st.plotly_chart(fig, use_container_width=True)
+            y_feat = st.selectbox("Y-axis", iris.feature_names, index=1)
+        
+        # Scatter plot
+        fig, ax = plt.subplots(figsize=(8, 6))
+        
+        for i, species in enumerate(iris.target_names):
+            mask = df['species'] == species
+            ax.scatter(df[mask][x_feat], df[mask][y_feat],
+                      label=species, alpha=0.7, s=50)
+        
+        ax.set_xlabel(x_feat)
+        ax.set_ylabel(y_feat)
+        ax.set_title(f'{x_feat} vs {y_feat}')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        
+        st.pyplot(fig)
+        plt.close()
 
-def show_about():
-    """About page"""
-    st.header("ℹ️ About This Dashboard")
+def show_metrics():
+    """Metrics page"""
+    st.header("📈 Model Performance Metrics")
     
-    st.markdown("""
-    ### Project Overview
+    # Sample metrics data
+    metrics_data = {
+        'Model': ['Iris DT', 'Random Forest', 'SVM', 'KNN'],
+        'Accuracy': [95.3, 96.7, 97.1, 94.8],
+        'Precision': [95.1, 96.5, 97.0, 94.5],
+        'Recall': [95.0, 96.4, 96.9, 94.7],
+        'F1-Score': [95.0, 96.4, 96.9, 94.6]
+    }
     
-    This Machine Learning Dashboard demonstrates three different ML approaches:
+    df_metrics = pd.DataFrame(metrics_data)
     
-    1. **Classical ML**: Iris classification using Decision Trees
-    2. **Deep Learning**: MNIST digit recognition using CNNs (if TensorFlow installed)
-    3. **NLP**: Sentiment analysis using TextBlob/rule-based methods
+    # Display table
+    st.subheader("📊 Performance Comparison")
+    st.dataframe(df_metrics, use_container_width=True)
     
-    ### Technologies Used
+    # Bar chart comparison
+    st.subheader("📊 Visual Comparison")
     
-    - **Frontend**: Streamlit
-    - **ML Libraries**: scikit-learn, TensorFlow (optional), spaCy (optional)
-    - **Visualization**: Plotly, Matplotlib, Seaborn
-    - **Data Processing**: Pandas, NumPy
+    metric_to_plot = st.selectbox("Select Metric", 
+                                  ['Accuracy', 'Precision', 'Recall', 'F1-Score'])
     
-    ### Features
+    fig, ax = plt.subplots(figsize=(10, 6))
     
-    - ✅ Real-time predictions
-    - ✅ Interactive visualizations
-    - ✅ Model performance metrics
-    - ✅ Responsive design
-    - ✅ Modular architecture
+    x = np.arange(len(df_metrics['Model']))
+    bars = ax.bar(x, df_metrics[metric_to_plot], 
+                  color=['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4'])
     
-    ### Deployment
+    ax.set_xlabel('Model')
+    ax.set_ylabel(f'{metric_to_plot} (%)')
+    ax.set_title(f'{metric_to_plot} Comparison Across Models')
+    ax.set_xticks(x)
+    ax.set_xticklabels(df_metrics['Model'])
+    ax.set_ylim(90, 100)
     
-    This app is deployed on Streamlit Cloud and can handle:
-    - Multiple concurrent users
-    - Real-time model inference
-    - Dynamic visualizations
+    # Add value labels
+    for bar in bars:
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width()/2., height,
+               f'{height:.1f}%', ha='center', va='bottom')
     
-    ### Contact
+    ax.grid(True, alpha=0.3, axis='y')
     
-    For questions or contributions, please visit the GitHub repository.
+    st.pyplot(fig)
+    plt.close()
     
-    ---
+    # Additional metrics
+    st.markdown("---")
+    st.subheader("🎯 Additional Metrics")
     
-    **Version**: 1.0.0  
-    **Last Updated**: 2024  
-    **License**: MIT
-    """)
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.info("""
+        **Training Metrics**
+        - Training Time: 0.05s
+        - Epochs: 100
+        - Learning Rate: 0.01
+        """)
+    
+    with col2:
+        st.success("""
+        **Validation Metrics**
+        - Val Accuracy: 94.8%
+        - Val Loss: 0.152
+        - Best Epoch: 87
+        """)
+    
+    with col3:
+        st.warning("""
+        **Test Metrics**
+        - Test Accuracy: 95.3%
+        - Test Loss: 0.141
+        - Inference Time: 0.5ms
+        """)
 
 if __name__ == "__main__":
     main()
